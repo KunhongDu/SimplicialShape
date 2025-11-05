@@ -14,7 +14,7 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; _≢_; refl; cong; sym)
 open import Relation.Nullary using (¬_; contradiction)
 open import Function using (_∘_; id)
-open import Data.Product.Base using (∃; ∃-syntax)
+open import Data.Product.Base using (∃; ∃-syntax; _×_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Agda.Builtin.Sigma using (Σ; _,_) renaming (fst to proj₁ ; snd to proj₂)
 
@@ -221,6 +221,9 @@ of∈imageList : ∀ {n m y} → (f : Fin n → Fin m) → y ∈ imageList f →
 of∈imageList {ℕ.suc n} {m} {y} f ∈head = zero , refl
 of∈imageList {ℕ.suc n} {m} {y} f (∈cons mem) = suc (proj₁ (of∈imageList _ mem)) , proj₂ (of∈imageList _ mem)
 
+of∈?imageList≡trueInd : ∀ {n m y} → (f : Fin n → Fin m) → y ∈? imageList f ≡ true → ∃[ i ] y ≡ f i
+of∈?imageList≡trueInd f mem = of∈imageList f (∈?≡true⇒∈ mem) 
+
 Inj⇒¬∈imageList : ∀ {n m} (f : Fin (ℕ.suc n) → Fin m) → Inj f → ¬ f zero ∈ imageList (λ i → f (suc i))
 Inj⇒¬∈imageList {n} {m} f inj mem = FinProp.0≢1+n (inj (proj₂ (of∈imageList _ mem)))
 
@@ -236,13 +239,83 @@ ListToFun {m} (x ∷ f) = ℕ.suc (proj₁ (ListToFun f)) , f'
     f' : Fin (ℕ.suc (proj₁ (ListToFun f))) → Fin m
     f' zero = x
     f' (suc i) = proj₂ (ListToFun f) i
-
-factor : ∀ {n m} → (f : Fin n → Fin m) → ℕ
-factor f = proj₁ (ListToFun (toNondup (imageList f)))
+    {-
+    factor : ∀ {n m} → (f : Fin n → Fin m) → ℕ
+    factor f = proj₁ (ListToFun (toNondup (imageList f)))
 
 factorInj : ∀ {n m} → (f : Fin n → Fin m) → (Fin (factor f) → Fin m)
 factorInj f = proj₂ (ListToFun (toNondup (imageList f)))
-
+-}
 --- question.. Without funext, how can show it's a factorization???
 
 -- for factorSurj : Consider a list like [011334799]; from its tail we have [00112344]; then with ¬ 0 ∈ tail, we add 0 ∷ suc (rest of them)
+
+-- Do the factorization at the same 
+
+tail : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin m) → Fin n → Fin m
+tail f i = f (suc i)
+
+ind : ∀ {n m} → (f : Fin n → Fin m) → ℕ
+ind {ℕ.zero} f = ℕ.zero
+ind {ℕ.suc n} f with f zero ∈? imageList (tail f)
+... | true = ind (tail f)
+... | false = ℕ.suc (ind (tail f))
+
+factorL : ∀ {n m} → (f : Fin n → Fin m) →  Fin n → Fin (ind f)
+factorL {ℕ.zero} f ()
+factorL {ℕ.suc n} {ℕ.zero} f = ⊥-elim (FinProp.¬Fin0 (f zero)) 
+factorL {ℕ.suc n} {ℕ.suc m} f x with f zero ∈? imageList (tail f) in mem
+factorL {ℕ.suc n} {ℕ.suc m} f zero | true = factorL (tail f) (proj₁ (of∈?imageList≡trueInd _ mem))
+factorL {ℕ.suc n} {ℕ.suc m} f (suc x) | true = factorL (tail f) x
+factorL {ℕ.suc n} {ℕ.suc m} f zero | false = zero
+factorL {ℕ.suc n} {ℕ.suc m} f (suc x) | false = suc (factorL (tail f) x)
+
+factorR : ∀ {n m} → (f : Fin n → Fin m) →  Fin (ind f) → Fin m
+factorR {ℕ.zero} f ()
+factorR {ℕ.suc n} f x with f zero ∈? imageList (tail f)
+factorR {ℕ.suc n} f x | true = factorR (tail f) x
+factorR {ℕ.suc n} f zero | false = f zero
+factorR {ℕ.suc n} f (suc x) | false = factorR (tail f) x
+
+{-
+zero5 : Fin 5
+zero5 = zero
+one5  : Fin 5
+one5  = suc zero
+two5  : Fin 5
+two5  = suc (suc zero)
+three5 : Fin 5
+three5 = suc (suc (suc zero))
+four5  : Fin 5
+four5  = suc (suc (suc (suc zero)))
+
+zero3 : Fin 3
+zero3 = zero
+
+one3 : Fin 3
+one3 = suc zero
+
+two3 : Fin 3
+two3 = suc (suc zero)
+
+zero4 : Fin 4
+zero4 = zero
+
+one4 : Fin 4
+one4 = suc zero
+
+two4 : Fin 4
+two4 = suc (suc zero)
+
+three4 : Fin 4
+three4 = suc (suc (suc zero))
+
+
+f : Fin 5 → Fin 4
+f zero = two4                       -- 0 ↦ 0
+f (suc zero) = two4                    -- 1 ↦ 0
+f (suc (suc zero)) = three4              -- 2 ↦ 0
+f (suc (suc (suc zero))) = three4     -- 3 ↦ 2
+f (suc (suc (suc (suc zero)))) = one4  -- 4 ↦ 3
+-}
+
