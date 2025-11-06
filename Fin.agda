@@ -1,163 +1,20 @@
 module Fin where
 
 open import Data.Fin using (Fin; zero; suc; _≤_; _<_; toℕ)
-import Data.Fin.Properties as FinProp
-import Data.Nat.Properties as ℕProp
-open import Data.List
-  using (List; []; _∷_; map; _++_; length)
 open import Data.Nat using (ℕ)
+open import Data.Fin.Properties as FinProp using (_≟_)
+import Data.Nat.Properties as ℕProp
 open import Data.Bool using (Bool; true; false)
-open import Data.Fin.Properties using (_≟_)
 open import Relation.Nullary using (Dec; yes; no)
 open import Relation.Binary.Definitions using (Tri)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; _≢_; refl; cong; sym)
+  using (_≡_; _≢_; refl; cong; sym; trans)
 open import Relation.Nullary using (¬_; contradiction)
-open import Function using (_∘_; id)
 open import Data.Product.Base using (∃; ∃-syntax; _×_)
+open import Function using (_∘_; id)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Agda.Builtin.Sigma using (Σ; _,_) renaming (fst to proj₁ ; snd to proj₂)
 
-imageList : ∀ {n m} → (Fin n → Fin m) → List (Fin m)
-imageList {ℕ.zero}  f = []
-imageList {ℕ.suc n} f = f zero ∷ imageList (λ i → f (suc i))
-
-{-
-open import Relation.Binary.PropositionalEquality
-testFun : Fin 2 → Fin 3
-testFun zero = zero
-testFun (suc zero) = suc (suc zero)
-
-testList : List (Fin 3)
-testList = zero ∷ suc (suc zero) ∷ []
-
-testEq : imageList testFun ≡ testList
-testEq = refl
--}
-
-infix 5 _∈?_
-infix 5 _∈_
-
-data _∈_ {n} : Fin n → List (Fin n) → Set where
-  ∈head : ∀ {x xs} → x ∈ (x ∷ xs)
-  ∈cons : ∀ {x y xs} → x ∈ xs → x ∈ (y ∷ xs)
-
-_∈?_ : ∀ {n} → Fin n → List (Fin n) → Bool
-x ∈? []       = false
-x ∈? (y ∷ ys) with x ≟ y
-... | yes _ = true
-... | no  _ = x ∈? ys
-
-∈⇒∈?≡true : ∀ {n} {x : Fin n} {xs : List (Fin n)} → x ∈ xs → x ∈? xs ≡ true
-∈⇒∈?≡true {n} {x} {xs} ∈head with x ≟ x
-... | yes _ = refl
-... | no a = contradiction refl a
-∈⇒∈?≡true {n} {x} {xs} (∈cons {y = y} mem) with x ≟ y
-... | yes _ = refl
-... | no _ = ∈⇒∈?≡true mem
-
-∈?≡true⇒∈ : ∀ {n} {x : Fin n} {xs : List (Fin n)} → x ∈? xs ≡ true → x ∈ xs
-∈?≡true⇒∈ {n} {x} {xs = y ∷ xs} mem with x ≟ y
-... | yes a rewrite a = ∈head
-... | no _ = ∈cons (∈?≡true⇒∈ mem)
-
-¬∈⇒∈?≡false : ∀ {n} {x : Fin n} {xs : List (Fin n)} → ¬ x ∈ xs → x ∈? xs ≡ false
-¬∈⇒∈?≡false {n} {x} {xs} notmem with x ∈? xs in eq
-... | true = ⊥-elim (notmem (∈?≡true⇒∈ eq))
-... | false = refl
-
-data nondup {n} : List (Fin n) → Set where
-  nd-[] : nondup []
-  nd-∷ : ∀ {x xs} → (x ∈? xs ≡ false) → nondup xs → nondup (x ∷ xs)
-  
-toNondup : ∀ {n} → List (Fin n) → List (Fin n)
-toNondup []       = []
-toNondup (x ∷ xs) with x ∈? xs
-... | true  = toNondup xs
-... | false = x ∷ toNondup xs
-
-toNondup≡ : ∀ {n} → {f : List (Fin n)} → nondup f → toNondup f ≡ f
-toNondup≡ {n} {f} nd-[] = refl
-toNondup≡ {n} {x ∷ xs} (nd-∷ x∈? nd) with x ∈? xs
-... | false = cong (λ xs → _ ∷ xs) (toNondup≡ nd)
-
-∈?≡true⇒∈?toNondup≡true : ∀ {n x} → (f : List (Fin n)) → x ∈? f ≡ true → x ∈? toNondup f ≡ true
-∈?≡true⇒∈?toNondup≡true {x = x} (y ∷ f) eq with y ∈? f in eq'
-... | true with x ≟ y
-...     | yes a rewrite a = ∈?≡true⇒∈?toNondup≡true f eq'
-...     | no _ = ∈?≡true⇒∈?toNondup≡true f eq
-∈?≡true⇒∈?toNondup≡true  {x = x} (y ∷ f) eq | false with x ≟ y
-... | yes _ = refl
-... | no _ = ∈?≡true⇒∈?toNondup≡true f eq
-
-∈?≡false⇒∈?toNondup≡false : ∀ {n x} → (f : List (Fin n)) → x ∈? f ≡ false → x ∈? toNondup f ≡ false
-∈?≡false⇒∈?toNondup≡false [] eq = eq
-∈?≡false⇒∈?toNondup≡false {x = x} (y ∷ f) eq with y ∈? f in eq'
-... | true with x ≟ y
-...     | no _ = ∈?≡false⇒∈?toNondup≡false f eq
-∈?≡false⇒∈?toNondup≡false {x = x} (y ∷ f) eq | false with x ≟ y
-... | yes _ = eq
-... | no _ =  ∈?≡false⇒∈?toNondup≡false f eq
-
-∈?toNondup≡true⇒∈?≡true : ∀ {n x} → (f : List (Fin n)) → x ∈? toNondup f ≡ true → x ∈? f ≡ true
-∈?toNondup≡true⇒∈?≡true {x = x} f eq with x ∈? f in eq'
-... | true = refl
-... | false rewrite (∈?≡false⇒∈?toNondup≡false f eq') = eq
-
-∈?toNondup≡false⇒∈?≡false : ∀ {n x} → (f : List (Fin n)) → x ∈? toNondup f ≡ false → x ∈? f ≡ false
-∈?toNondup≡false⇒∈?≡false {x = x} f eq with x ∈? f in eq'
-... | true rewrite (∈?≡true⇒∈?toNondup≡true f eq') = eq
-... | false = refl
-
-{-
-∈≡true⇒∈toNondup≡true' : ∀ {n x} → (f : List (Fin n)) → x ∈? f ≡ true → x ∈? toNondup f ≡ true
-∈≡true⇒∈toNondup≡true' {x = x} (y ∷ f) eq with x ≟ y | y ∈? f in eq'
-... | yes _ | true = {!!}
-... | yes _ | false = {!!}
-... | no _  | fasle = {!!}
-... | no _  | true = {!!}
--}
-{-
-∈≡true⇒∈toNondup≡true : ∀ {n x} → {f : List (Fin n)} → x ∈? f ≡ true → x ∈? toNondup f ≡ true
-∈≡true⇒∈toNondup≡true {x = x} {f = y ∷ f} eq with y ∈? f in eq'
-... | true with x ≟ y
-...     | yes a rewrite a = ∈≡true⇒∈toNondup≡true f eq'
-...     | no _ = ∈≡true⇒∈toNondup≡true f eq
-∈≡true⇒∈toNondup≡true  {x = x} {f = y ∷ f} eq | false with x ≟ y
-... | yes _ = refl
-... | no _ = ∈≡true⇒∈toNondup≡true f eq
--}
-
-toNondupNondup : ∀ {n} → (f : List (Fin n)) → nondup (toNondup f)
-toNondupNondup [] = nd-[]
-toNondupNondup (x ∷ f) with x ∈? f in eq
-... | true = toNondupNondup f
-... | false = nd-∷ (∈?≡false⇒∈?toNondup≡false f eq) (toNondupNondup f)
-
-{-
-open import Relation.Binary.PropositionalEquality
-
-testList : List (Fin 4)
-testList = zero ∷ zero ∷ suc (suc zero) ∷ suc (suc (suc zero))
-  ∷ suc (suc zero) ∷ []
-
-testEq : nondup testList ≡ zero ∷ suc (suc (suc zero)) ∷ suc (suc zero) ∷ []
-testEq = refl
--}
-
-imageCard : ∀ {n m} → (Fin n → Fin m) → ℕ
-imageCard f = length (toNondup (imageList f))
-
-{-
-open import Relation.Binary.PropositionalEquality
-testFun : Fin 3 → Fin 4
-testFun zero = zero
-testFun (suc zero) = suc (suc zero)
-testFun (suc (suc zero)) = suc (suc zero)
-
-testEq : imageCard testFun ≡ 2
-testEq = refl
--}
 Mono : {n m : ℕ} → (f : Fin n → Fin m) → Set
 Mono f = ∀ {i j} → i ≤ j → f i ≤ f j
 
@@ -180,7 +37,7 @@ sMono⇒inj {n} {m} {f} sMono {i} {j} fi≡fj with FinProp.<-cmp i j
 ... | Tri.tri> _ _ j<i = contradiction (sMono j<i) (FinProp.<-irrefl (sym fi≡fj))
 
 Surj : {n m : ℕ} → (f : Fin n → Fin m) → Set
-Surj f = ∀ y → ∃[ x ] f x ≡ y
+Surj f = ∀ y → ∃[ x ] y ≡ f x
 
 record _→+_ (n m : ℕ) : Set where
   field
@@ -210,7 +67,7 @@ _∘→+_ g f = record
   ; mono = λ {i}{j} i≤j → _→+_.mono g (_→+_.mono f i≤j)
   }
 
-
+{-
 -- Inj ⇒ nondup imageList
 
 -- headNotInTail : ∀ {n m} (f : Fin (ℕ.suc n) → Fin m) → Inj f → ¬ f zero ∈ imageList (λ i → f (suc i))
@@ -231,91 +88,150 @@ Inj⇒nondupImageList : ∀ {n m} → (f : Fin n → Fin m) → Inj f → nondup
 Inj⇒nondupImageList {ℕ.zero} {m} f inj = nd-[]
 Inj⇒nondupImageList {ℕ.suc n} {m} f inj = nd-∷ (¬∈⇒∈?≡false (Inj⇒¬∈imageList _ inj))
   (Inj⇒nondupImageList _ (λ eq →  FinProp.suc-injective (inj eq)))
-
-ListToFun : ∀ {m} → (f : List (Fin m)) → ∃[ i ] (Fin i → Fin m)
-ListToFun {m} [] = ℕ.zero , λ()
-ListToFun {m} (x ∷ f) = ℕ.suc (proj₁ (ListToFun f)) , f'
-  where
-    f' : Fin (ℕ.suc (proj₁ (ListToFun f))) → Fin m
-    f' zero = x
-    f' (suc i) = proj₂ (ListToFun f) i
-    {-
-    factor : ∀ {n m} → (f : Fin n → Fin m) → ℕ
-    factor f = proj₁ (ListToFun (toNondup (imageList f)))
-
-factorInj : ∀ {n m} → (f : Fin n → Fin m) → (Fin (factor f) → Fin m)
-factorInj f = proj₂ (ListToFun (toNondup (imageList f)))
 -}
---- question.. Without funext, how can show it's a factorization???
 
--- for factorSurj : Consider a list like [011334799]; from its tail we have [00112344]; then with ¬ 0 ∈ tail, we add 0 ∷ suc (rest of them)
-
--- Do the factorization at the same 
 
 tail : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin m) → Fin n → Fin m
 tail f i = f (suc i)
 
-ind : ∀ {n m} → (f : Fin n → Fin m) → ℕ
-ind {ℕ.zero} f = ℕ.zero
-ind {ℕ.suc n} f with f zero ∈? imageList (tail f)
-... | true = ind (tail f)
-... | false = ℕ.suc (ind (tail f))
+infix 5 _∈''_
 
-factorL : ∀ {n m} → (f : Fin n → Fin m) →  Fin n → Fin (ind f)
+data _∈''_ : ∀ {n m} → (x : Fin m) → (f : Fin n → Fin m) → Set where
+  ∈''-zero : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin m) → f zero ∈'' f
+  ∈''-tail : ∀ {n m} → (x : Fin m) → (f : Fin (ℕ.suc n) → Fin m) → x ∈'' tail f → x ∈'' f
+
+app∈'' : ∀ {n m} → (x : Fin n) → (f : Fin n → Fin m) → f x ∈'' f
+app∈'' {ℕ.suc n} zero f = ∈''-zero f
+app∈'' {ℕ.suc n} (suc x) f = ∈''-tail _ _ (app∈'' _ _)
+
+≡app∈'' : ∀ {n m x y} → (f : Fin n → Fin m) → y ≡ f x → y ∈'' f
+≡app∈'' _ refl = app∈'' _ _
+
+∈''⇒app∈'' : ∀ {n m k x} → (f : Fin n → Fin m) → (g : Fin m → Fin k) → x ∈'' f → g x ∈'' g ∘ f
+∈''⇒app∈'' f g (∈''-zero f) = ∈''-zero _
+∈''⇒app∈'' f g (∈''-tail x f mem) = ∈''-tail _ _ (∈''⇒app∈'' _ _ mem)
+
+Dec∈''⇒Dec≡⇒Dec∈'' : ∀ {n m} → {x : Fin m} → {f : Fin (ℕ.suc n) → Fin m} → Dec (x ∈'' tail f) → Dec (x ≡ f zero) → Dec (x ∈'' f)
+Dec∈''⇒Dec≡⇒Dec∈'' {n} {m} {x} {f} (yes p) _ = yes (∈''-tail _ _ p)
+Dec∈''⇒Dec≡⇒Dec∈'' {n} {m} {x} {f} _ (yes refl) = yes (∈''-zero _)
+Dec∈''⇒Dec≡⇒Dec∈'' {n} {m} {x} {f} (no np) (no nq) = no aux where
+  aux : ¬ x ∈'' f
+  aux (∈''-zero f) = nq refl
+  aux (∈''-tail x f mem) = np mem
+
+_∈''?_ : ∀ {n m} → (x : Fin m) → (f : Fin n → Fin m) → Dec (x ∈'' f)
+_∈''?_ {ℕ.zero} x f = no λ()
+_∈''?_ {ℕ.suc n} x f = Dec∈''⇒Dec≡⇒Dec∈'' (x ∈''? tail f) (x ≟ f zero)
+
+∈''⇒i : ∀ {n m} → {x : Fin m} → {f : Fin n → Fin m} → x ∈'' f → Fin n
+∈''⇒i {ℕ.suc n} {m} {x} {f} (∈''-zero f) = zero
+∈''⇒i {ℕ.suc n} {m} {x} {f} (∈''-tail x f mem) = suc (∈''⇒i mem)
+
+∈''⇒i≡ : ∀ {n m} → {x : Fin m} → {f : Fin n → Fin m} → (mem : x ∈'' f) → x ≡ f (∈''⇒i mem)
+∈''⇒i≡ {ℕ.suc n} {m} {x} {f} (∈''-zero f) = refl
+∈''⇒i≡ {ℕ.suc n} {m} {x} {f} (∈''-tail x f mem) = ∈''⇒i≡ mem
+
+∀∈''⇒Surj : ∀ {n m} → (f : Fin n → Fin m) → (∀ {x} → x ∈'' f) → Surj f
+∀∈''⇒Surj f p x = _ , ∈''⇒i≡ p
+
+factorInd : ∀ {n m} → (f : Fin n → Fin m) → ℕ
+factorInd {ℕ.zero} f = ℕ.zero
+factorInd {ℕ.suc n} f with f zero ∈''? tail f
+... | yes _ = factorInd (tail f)
+... | no _ = ℕ.suc (factorInd (tail f))
+
+factorL : ∀ {n m} → (f : Fin n → Fin m) →  Fin n → Fin (factorInd f)
+updateLYes : ∀{n m} → (f : Fin (ℕ.suc n) → Fin (ℕ.suc m)) → (p : f zero ∈'' tail f) → Fin (ℕ.suc n) → Fin (factorInd (tail f))
+updateLNo : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin (ℕ.suc m)) → Fin (ℕ.suc n) → Fin (ℕ.suc (factorInd (tail f)))
+
 factorL {ℕ.zero} f ()
 factorL {ℕ.suc n} {ℕ.zero} f = ⊥-elim (FinProp.¬Fin0 (f zero)) 
-factorL {ℕ.suc n} {ℕ.suc m} f x with f zero ∈? imageList (tail f) in mem
-factorL {ℕ.suc n} {ℕ.suc m} f zero | true = factorL (tail f) (proj₁ (of∈?imageList≡trueInd _ mem))
-factorL {ℕ.suc n} {ℕ.suc m} f (suc x) | true = factorL (tail f) x
-factorL {ℕ.suc n} {ℕ.suc m} f zero | false = zero
-factorL {ℕ.suc n} {ℕ.suc m} f (suc x) | false = suc (factorL (tail f) x)
+factorL {ℕ.suc n} {ℕ.suc m} f x with f zero ∈''? tail f
+...                              | yes mem = updateLYes f mem x
+...                              | no _ = updateLNo f x
 
-factorR : ∀ {n m} → (f : Fin n → Fin m) →  Fin (ind f) → Fin m
+updateLYes f mem zero = factorL (tail f) (∈''⇒i mem)
+updateLYes f mem (suc x) = factorL (tail f) x
+
+updateLNo f zero = zero
+updateLNo f (suc x) = suc (factorL (tail f) x)
+
+factorR : ∀ {n m} → (f : Fin n → Fin m) →  Fin (factorInd f) → Fin m
+updateR : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin m) → Fin (ℕ.suc (factorInd (tail f))) → Fin m
+
 factorR {ℕ.zero} f ()
-factorR {ℕ.suc n} f x with f zero ∈? imageList (tail f)
-factorR {ℕ.suc n} f x | true = factorR (tail f) x
-factorR {ℕ.suc n} f zero | false = f zero
-factorR {ℕ.suc n} f (suc x) | false = factorR (tail f) x
+factorR {ℕ.suc n} f x with f zero ∈''? tail f
+...                   | yes _ = factorR (tail f) x
+...                   | no _ = updateR f x
+
+updateR f zero = f zero
+updateR f (suc x) = factorR (tail f) x
+
+factorRfactorL≡ : ∀ {n m} → (f : Fin n → Fin m) → (x : Fin n) → factorR f ((factorL f) x) ≡ f x
+factorRfactorL≡ {ℕ.suc n} {ℕ.zero} f x = ⊥-elim (FinProp.¬Fin0 (f zero))
+factorRfactorL≡ {ℕ.suc n} {ℕ.suc m} f x with f zero ∈''? tail f
+factorRfactorL≡ {ℕ.suc n} {ℕ.suc m} f zero | yes p = trans (factorRfactorL≡ (tail f) (∈''⇒i p)) (sym (∈''⇒i≡ p)) 
+factorRfactorL≡ {ℕ.suc n} {ℕ.suc m} f (suc x) | yes p = factorRfactorL≡ (tail f) x
+factorRfactorL≡ {ℕ.suc n} {ℕ.suc m} f zero | no p = refl
+factorRfactorL≡ {ℕ.suc n} {ℕ.suc m} f (suc x) | no p = factorRfactorL≡ (tail f) x
+
+-- This proof needs to do recursion on factorR and updateR at the same time..
+-- So I split out updateR instead of nesting it inside factorR.
+∈''factorR⇒∈'' : ∀ {n m x} → (f : Fin n → Fin m) → x ∈'' factorR f → x ∈'' f
+∈''updateR⇒∈'' : ∀ {n m x} → (f : Fin (ℕ.suc n) → Fin m) → x ∈'' updateR f → x ∈'' f
+
+∈''factorR⇒∈'' {ℕ.suc n} {m} {x} f mem with f zero ∈''? tail f
+∈''factorR⇒∈'' {ℕ.suc n} {m} f mem | yes p = ∈''-tail _ f (∈''factorR⇒∈'' (tail f) mem)
+∈''factorR⇒∈'' {ℕ.suc n} {m} {x} f mem | no p = ∈''updateR⇒∈'' _ mem
+
+∈''updateR⇒∈'' f (∈''-zero _) = ∈''-zero _
+∈''updateR⇒∈'' f (∈''-tail x _ mem) = ∈''-tail _ _ (∈''factorR⇒∈'' _ mem)
+
+∈''⇒∈''factorR : ∀ {n m x} → (f : Fin n → Fin m) → x ∈'' f → x ∈'' factorR f
+∈''⇒∈''factorR f mem rewrite ∈''⇒i≡ mem = ≡app∈'' _ (sym (factorRfactorL≡ f (∈''⇒i mem)))
+
+factorRInj : ∀ {n m} → (f : Fin n → Fin m) → Inj (factorR f)
+factorRInj {ℕ.suc n} {m} f eq with f zero ∈''? tail f
+factorRInj {ℕ.suc n} {m} f eq | yes p = factorRInj (tail f) eq
+factorRInj {ℕ.suc n} {m} f {zero} {zero} eq | no p = refl
+factorRInj {ℕ.suc n} {m} f {zero} {suc j} eq | no p = ⊥-elim (p (∈''factorR⇒∈'' _ (≡app∈'' _ eq)))
+factorRInj {ℕ.suc n} {m} f {suc i} {zero} eq | no p = ⊥-elim (p (∈''factorR⇒∈'' _ (≡app∈'' _ (sym eq))))
+factorRInj {ℕ.suc n} {m} f {suc i} {suc j} eq | no p = cong suc (factorRInj (tail f) eq)
 
 {-
-zero5 : Fin 5
-zero5 = zero
-one5  : Fin 5
-one5  = suc zero
-two5  : Fin 5
-two5  = suc (suc zero)
-three5 : Fin 5
-three5 = suc (suc (suc zero))
-four5  : Fin 5
-four5  = suc (suc (suc (suc zero)))
+f zero ∈''? tail f != w of type Dec (f zero ∈'' (λ i → f (suc i)))
+when checking that the type
+(n : ℕ) {m : ℕ} (f : Fin (ℕ.suc n) → Fin m)
+(w : Dec (f zero ∈'' (λ i → f (suc i))))
+(x : Fin (factorInd f | w)) →
+x ∈'' factorL f
+of the generated with function is well-formed
 
-zero3 : Fin 3
-zero3 = zero
-
-one3 : Fin 3
-one3 = suc zero
-
-two3 : Fin 3
-two3 = suc (suc zero)
-
-zero4 : Fin 4
-zero4 = zero
-
-one4 : Fin 4
-one4 = suc zero
-
-two4 : Fin 4
-two4 = suc (suc zero)
-
-three4 : Fin 4
-three4 = suc (suc (suc zero))
+∀∈''factorL : ∀ {n m} → (f : Fin n → Fin m) → (x : Fin (factorInd f)) → x ∈'' factorL f
+∀∈''factorL {ℕ.suc n} {m} f with f zero ∈''? tail f
+... | yes p = ?
+... | no p = ?-}
 
 
-f : Fin 5 → Fin 4
-f zero = two4                       -- 0 ↦ 0
-f (suc zero) = two4                    -- 1 ↦ 0
-f (suc (suc zero)) = three4              -- 2 ↦ 0
-f (suc (suc (suc zero))) = three4     -- 3 ↦ 2
-f (suc (suc (suc (suc zero)))) = one4  -- 4 ↦ 3
--}
+∀∈''factorL : ∀ {n m} → (f : Fin n → Fin m) → (x : Fin (factorInd f)) → x ∈'' factorL f
+∀∈''updateLYes : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin (ℕ.suc m)) → (mem : f zero ∈'' tail f)
+  → (x : Fin (factorInd (tail f))) → x ∈'' updateLYes f mem 
+∀∈''updateLNo : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin (ℕ.suc m)) → (x : Fin (ℕ.suc (factorInd (tail f)))) → x ∈'' updateLNo f
 
+∀∈''factorL {ℕ.suc n} {ℕ.zero} f x = ⊥-elim (FinProp.¬Fin0 (f zero))
+∀∈''factorL {ℕ.suc n} {ℕ.suc m} f x with f zero ∈''? tail f
+... | yes p = ∀∈''updateLYes _ p _
+... | no p = ∀∈''updateLNo _ _
+
+∀∈''updateLYes f mem x = ∈''-tail _ _ (∀∈''factorL (tail f) x)
+
+∀∈''updateLNo f zero = ∈''-zero _
+∀∈''updateLNo f (suc x) = ∈''-tail _ _ (∈''⇒app∈'' _ suc (∀∈''factorL (tail f) x))
+
+factorLSurj : ∀ {n m} → (f : Fin n → Fin m) → Surj (factorL f)
+factorLSurj f = ∀∈''⇒Surj _ λ{x} → ∀∈''factorL f x
+
+-- put it somewhere else
+tailMono+≤⇒Mono : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin m) → Mono (tail f) → (∀ {i} → f zero ≤ f i) → Mono f
+tailMono+≤⇒Mono f mono zero≤ {zero} _ = zero≤
+tailMono+≤⇒Mono f mono zero≤ {suc i} {suc j} (Data.Nat.s≤s le) = mono le
