@@ -15,14 +15,20 @@ open import Function using (_∘_; id)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Agda.Builtin.Sigma using (Σ; _,_) renaming (fst to proj₁ ; snd to proj₂)
 
+tail : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin m) → Fin n → Fin m
+tail f i = f (suc i)
+
 Mono : {n m : ℕ} → (f : Fin n → Fin m) → Set
 Mono f = ∀ {i j} → i ≤ j → f i ≤ f j
 
 sMono : {n m : ℕ} → (f : Fin n → Fin m) → Set
-sMono f = ∀ {i j} → (i < j → f i < f j)
+sMono f = ∀ {i j} → i < j → f i < f j
 
 Inj : {n m : ℕ} → (f : Fin n → Fin m) → Set
 Inj f = ∀ {i j} → f i ≡ f j → i ≡ j
+
+Mono+Inj⇒sMono : {n m : ℕ} → {f : Fin n → Fin m} → Mono f → Inj f → sMono f
+Mono+Inj⇒sMono mono inj lt = FinProp.≤∧≢⇒< (mono (ℕProp.<⇒≤ lt)) λ eq → FinProp.<-irrefl (inj eq) lt
 
 sMono⇒Mono : {n m : ℕ} → {f : Fin n → Fin m} → sMono f → Mono f
 sMono⇒Mono {n} {m} {f} sMono {i} {j} i≤j with FinProp.<-cmp i j
@@ -35,6 +41,16 @@ sMono⇒inj {n} {m} {f} sMono {i} {j} fi≡fj with FinProp.<-cmp i j
 ... | Tri.tri< i<j _ _ = contradiction (sMono i<j) (FinProp.<-irrefl fi≡fj)
 ... | Tri.tri≈ _ i≡j _ = i≡j
 ... | Tri.tri> _ _ j<i = contradiction (sMono j<i) (FinProp.<-irrefl (sym fi≡fj))
+
+tailMono+zero≤⇒Mono : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin m) → Mono (tail f) → (∀ {i} → f zero ≤ f i) → Mono f
+tailMono+zero≤⇒Mono f mono zero≤ {zero} _ = zero≤
+tailMono+zero≤⇒Mono f mono zero≤ {suc i} {suc j} (Data.Nat.s≤s le) = mono le
+
+Mono⇒tailMono : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin m) → Mono f → Mono (tail f)
+Mono⇒tailMono f mono le = mono (Data.Nat.s≤s le)
+
+Mono⇒zero≤ : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin m) → Mono f → (∀ {i} → f zero ≤ f i)
+Mono⇒zero≤ f mono = mono Data.Nat.z≤n
 
 Surj : {n m : ℕ} → (f : Fin n → Fin m) → Set
 Surj f = ∀ y → ∃[ x ] y ≡ f x
@@ -87,12 +103,8 @@ Inj⇒¬∈imageList {n} {m} f inj mem = FinProp.0≢1+n (inj (proj₂ (of∈ima
 Inj⇒nondupImageList : ∀ {n m} → (f : Fin n → Fin m) → Inj f → nondup (imageList f)
 Inj⇒nondupImageList {ℕ.zero} {m} f inj = nd-[]
 Inj⇒nondupImageList {ℕ.suc n} {m} f inj = nd-∷ (¬∈⇒∈?≡false (Inj⇒¬∈imageList _ inj))
-  (Inj⇒nondupImageList _ (λ eq →  FinProp.suc-injective (inj eq)))
+(Inj⇒nondupImageList _ (λ eq →  FinProp.suc-injective (inj eq)))
 -}
-
-
-tail : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin m) → Fin n → Fin m
-tail f i = f (suc i)
 
 infix 5 _∈''_
 
@@ -198,6 +210,9 @@ factorRInj {ℕ.suc n} {m} f {zero} {suc j} eq | no p = ⊥-elim (p (∈''factor
 factorRInj {ℕ.suc n} {m} f {suc i} {zero} eq | no p = ⊥-elim (p (∈''factorR⇒∈'' _ (≡app∈'' _ (sym eq))))
 factorRInj {ℕ.suc n} {m} f {suc i} {suc j} eq | no p = cong suc (factorRInj (tail f) eq)
 
+≡⇒factorL≡ : ∀ {n m x y} → (f : Fin n → Fin m) → f x ≡ f y → factorL f x ≡ factorL f y
+≡⇒factorL≡ {x = x} {y = y} f eq = factorRInj f (trans (factorRfactorL≡ f x) (trans eq (sym (factorRfactorL≡ f y))))
+
 {-
 f zero ∈''? tail f != w of type Dec (f zero ∈'' (λ i → f (suc i)))
 when checking that the type
@@ -231,7 +246,26 @@ of the generated with function is well-formed
 factorLSurj : ∀ {n m} → (f : Fin n → Fin m) → Surj (factorL f)
 factorLSurj f = ∀∈''⇒Surj _ λ{x} → ∀∈''factorL f x
 
--- put it somewhere else
-tailMono+≤⇒Mono : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin m) → Mono (tail f) → (∀ {i} → f zero ≤ f i) → Mono f
-tailMono+≤⇒Mono f mono zero≤ {zero} _ = zero≤
-tailMono+≤⇒Mono f mono zero≤ {suc i} {suc j} (Data.Nat.s≤s le) = mono le
+Mono⇒factorRMono : ∀ {n m} → (f : Fin n → Fin m) → Mono f → Mono (factorR f)
+Mono⇒updateRMono : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin m) → Mono f → Mono (updateR f)
+
+Mono⇒factorRMono {ℕ.suc n} f mono le with f zero ∈''? tail f
+... | yes p = Mono⇒factorRMono (tail f) (Mono⇒tailMono f mono) le
+... | no p = Mono⇒updateRMono f mono le
+
+Mono⇒updateRMono f mono = tailMono+zero≤⇒Mono _ (Mono⇒factorRMono (tail f) (Mono⇒tailMono f mono)) λ{i} → aux i where
+  aux : ∀ (i) → f zero ≤ updateR f i
+  aux zero = FinProp.≤-refl
+  aux (suc i) rewrite ∈''⇒i≡ (∈''-tail _ f (∈''factorR⇒∈'' (tail f) (app∈'' i (factorR (tail f))))) = mono Data.Nat.z≤n
+
+Mono⇒factorRsMono : ∀ {n m} → (f : Fin n → Fin m) → Mono f → sMono (factorR f)
+Mono⇒factorRsMono f mono = Mono+Inj⇒sMono (Mono⇒factorRMono f mono) (factorRInj f)
+
+Mono⇒factorLMono : ∀ {n m} → (f : Fin n → Fin m) → Mono f → Mono (factorL f)
+Mono⇒factorLMono f mono {i} {j} le with FinProp.<-cmp (factorL f i) (factorL f j)
+... | Tri.tri< lt _ _ = ℕProp.<⇒≤ lt
+... | Tri.tri≈ _ eq _ = FinProp.≤-reflexive eq
+... | Tri.tri> _ _ lt = contradiction helper (ℕProp.<⇒≱ (Mono⇒factorRsMono f mono lt))
+  where
+  helper : factorR f (factorL f i) ≤ factorR f (factorL f j)
+  helper rewrite factorRfactorL≡ f i | factorRfactorL≡ f j = mono le 
