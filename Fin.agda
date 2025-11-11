@@ -1,3 +1,4 @@
+{-# OPTIONS --without-K #-}
 module Fin where
 
 open import Data.Fin using (Fin; zero; suc; _≤_; _<_; toℕ)
@@ -82,29 +83,6 @@ _∘→+_ g f = record
   { fun  = _→+_.fun g ∘ _→+_.fun f
   ; mono = λ {i}{j} i≤j → _→+_.mono g (_→+_.mono f i≤j)
   }
-
-{-
--- Inj ⇒ nondup imageList
-
--- headNotInTail : ∀ {n m} (f : Fin (ℕ.suc n) → Fin m) → Inj f → ¬ f zero ∈ imageList (λ i → f (suc i))
-
--- prove something like, x ∈ imageList, then y with fy = x...
-
-of∈imageList : ∀ {n m y} → (f : Fin n → Fin m) → y ∈ imageList f → ∃[ i ] y ≡ f i
-of∈imageList {ℕ.suc n} {m} {y} f ∈head = zero , refl
-of∈imageList {ℕ.suc n} {m} {y} f (∈cons mem) = suc (proj₁ (of∈imageList _ mem)) , proj₂ (of∈imageList _ mem)
-
-of∈?imageList≡trueInd : ∀ {n m y} → (f : Fin n → Fin m) → y ∈? imageList f ≡ true → ∃[ i ] y ≡ f i
-of∈?imageList≡trueInd f mem = of∈imageList f (∈?≡true⇒∈ mem) 
-
-Inj⇒¬∈imageList : ∀ {n m} (f : Fin (ℕ.suc n) → Fin m) → Inj f → ¬ f zero ∈ imageList (λ i → f (suc i))
-Inj⇒¬∈imageList {n} {m} f inj mem = FinProp.0≢1+n (inj (proj₂ (of∈imageList _ mem)))
-
-Inj⇒nondupImageList : ∀ {n m} → (f : Fin n → Fin m) → Inj f → nondup (imageList f)
-Inj⇒nondupImageList {ℕ.zero} {m} f inj = nd-[]
-Inj⇒nondupImageList {ℕ.suc n} {m} f inj = nd-∷ (¬∈⇒∈?≡false (Inj⇒¬∈imageList _ inj))
-(Inj⇒nondupImageList _ (λ eq →  FinProp.suc-injective (inj eq)))
--}
 
 infix 5 _∈''_
 
@@ -212,21 +190,6 @@ factorRInj {ℕ.suc n} {m} f {suc i} {suc j} eq | no p = cong suc (factorRInj (t
 
 ≡⇒factorL≡ : ∀ {n m x y} → (f : Fin n → Fin m) → f x ≡ f y → factorL f x ≡ factorL f y
 ≡⇒factorL≡ {x = x} {y = y} f eq = factorRInj f (trans (factorRfactorL≡ f x) (trans eq (sym (factorRfactorL≡ f y))))
-
-{-
-f zero ∈''? tail f != w of type Dec (f zero ∈'' (λ i → f (suc i)))
-when checking that the type
-(n : ℕ) {m : ℕ} (f : Fin (ℕ.suc n) → Fin m)
-(w : Dec (f zero ∈'' (λ i → f (suc i))))
-(x : Fin (factorInd f | w)) →
-x ∈'' factorL f
-of the generated with function is well-formed
-
-∀∈''factorL : ∀ {n m} → (f : Fin n → Fin m) → (x : Fin (factorInd f)) → x ∈'' factorL f
-∀∈''factorL {ℕ.suc n} {m} f with f zero ∈''? tail f
-... | yes p = ?
-... | no p = ?-}
-
 
 ∀∈''factorL : ∀ {n m} → (f : Fin n → Fin m) → (x : Fin (factorInd f)) → x ∈'' factorL f
 ∀∈''updateLYes : ∀ {n m} → (f : Fin (ℕ.suc n) → Fin (ℕ.suc m)) → (mem : f zero ∈'' tail f)
